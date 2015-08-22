@@ -10,10 +10,10 @@
 
 // PIN OUT S88N
 #define CLK PB6
-#define PS PB4
-#define DATA PB0
-#define RST PB5
-#define PWR PB3
+#define PS PB5
+#define DATA PB7
+#define RST PB4
+#define PWR PE6
 
 #define S88PORT PORTB
 #define S88PIN PINB
