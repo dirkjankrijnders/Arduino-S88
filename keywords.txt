@@ -1,0 +1,3 @@
+S88_t			KEYWORD2
+SetupS88Hardware	KEYWORD2
+StartS88Read		KEYWORD2
