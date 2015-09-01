@@ -3,8 +3,23 @@
 #include <util/delay.h>
 #include <avr/eeprom.h> 
 
-#define START_TIMER1 TCCR1B |= (1<<CS00)|(1<<CS01) 
-#define STOP_TIMER1  TCCR1B &= 0B11111000 
+#define S88_USE_TIMER3
+
+//#ifdef S88_USE_TIMER3
+//#warning S88 uses TIMER3
+#define S88_OCRA OCR3A
+#define S88_TCCRB TCCR3B
+#define S88_TIMSK TIMSK3
+#define S88_TIFR TIFR3
+#define S88_TIMER_COMPA_vect TIMER3_COMPA_vect
+//#else
+//#define S88_OCRA OCR1A
+//#define S88_TCCRB TCCR1B
+//#define S88_TIMSK TIMSK1
+//#define S88_TIMER_COMPA_vect TIMER1_COMPA_vect
+//#endif
+#define START_TIMER S88_TCCRB |= (1<<CS00)|(1<<CS01)
+#define STOP_TIMER  S88_TCCRB &= 0B11111000
 
 #define EEREFR (uint16_t*)0x0080
 
@@ -33,10 +48,10 @@ int commandBufferIndex = 0;
 
 volatile S88_t* _S88;
 
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER_COMPA_vect) {
   if (_S88->State.state == CLOCK) {
-    asm("sbi 0x03, 6");
-    //S88PORT ^= (1<<CLK); // Toggle the pin
+    //asm("sbi 0x03, 6");
+    S88PORT ^= (1<<CLK); // Toggle the pin
     _S88->State.CLKC--;
     if  (!(S88PIN & (1 << CLK))) // Down flank
     { 
@@ -221,7 +236,7 @@ void InitForTest(S88_t* S88) {
   while (S88->State.state != IDLE) {};
   
   // Stop reading the bus
-  STOP_TIMER1;
+  STOP_TIMER;
   
   // Pull RST, LOAD and CLK HIGH while power cycling the S88 bus. This causes compatible decoder to emit a predefined pattern
   PORTD |= ((1 << RST) | (1 << PS) | (1 << CLK));
@@ -232,7 +247,7 @@ void InitForTest(S88_t* S88) {
   PORTD &= ~((1 << RST) | (1 << PS) | (1 << CLK));
   
   // Compatible decoder should now start emitting a predefined pattern, the host computer can read the bus as usual
-  START_TIMER1;
+  START_TIMER;
 }
 
 void StartS88Read(S88_t* S88, reportstate full) {
@@ -242,7 +257,7 @@ void StartS88Read(S88_t* S88, reportstate full) {
   S88->State.module = 0;
   S88->State.bit = 0;
   _S88 = S88; // Make the S88 struct available to the interupt routine
-  START_TIMER1;
+  START_TIMER;
 }
 
 uint16_t GetClock(S88_t* S88) {
@@ -250,7 +265,7 @@ uint16_t GetClock(S88_t* S88) {
 }
 
 void SetClock(S88_t* S88, uint16_t* clk, int store) {
-  OCR1A = *clk;
+  S88_OCRA = *clk;
   if (store)
     eeprom_write_word(EEREFR, *clk);
 }
@@ -261,16 +276,17 @@ void SetupS88Hardware(void) {
   // Set pull up for data
 //    S88PORT |= (1 << DATA);
   // Setup S88 Clock
-  TIMSK1 = _BV(OCIE1A); // Interrupt on T0CNT == COMPA
-  TCCR1B = _BV(WGM12);  // Timer clear on Compare match
-  
+  S88_TIFR = (1 << OCF3A);
+  S88_TIMSK = _BV(OCIE1A); // Interrupt on T0CNT == COMPA
+  S88_TCCRB = _BV(WGM12);  // Timer clear on Compare match
+    S88_TCCRB |= S88_CS;
 //  OCR1A = 200;
-  OCR1A = eeprom_read_word(EEREFR); //T0CNT; // Set the compare value
+    S88_OCRA = 200; //eeprom_read_word(EEREFR); //T0CNT; // Set the compare value
 }
 
 void S88Reset(S88_t* S88) 
 {
-  STOP_TIMER1;
+  STOP_TIMER;
   S88->State.state = IDLE;
   S88->Config.modules[0] = 0;
   S88->Config.modules[1] = 0;
