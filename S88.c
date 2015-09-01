@@ -3,8 +3,8 @@
 #include <util/delay.h>
 #include <avr/eeprom.h> 
 
-#define START_TIMER1 TCCR1B |= (1<<CS00)|(1<<CS01) 
-#define STOP_TIMER1  TCCR1B &= 0B11111000 
+#define START_TIMER1 TCCR1B |= (1<<CS00)|(1<<CS01) // Prescaler /64
+#define STOP_TIMER1  TCCR1B &= 0B11111000 // All CS0x bits to zero
 
 #define EEREFR (uint16_t*)0x0080
 
