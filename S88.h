@@ -65,7 +65,7 @@ enum sendtypes {
   THREEBYTEDATA
 };
 
-void SetupS88Hardware(void);
+void SetupS88Hardware(S88_t* S88);
 void InitForTest(S88_t* S88);
 void SetClock(S88_t* S88, uint16_t* clk, int store);
 uint16_t GetClock(S88_t* S88);
