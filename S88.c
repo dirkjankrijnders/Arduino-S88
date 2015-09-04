@@ -271,8 +271,22 @@ void SetClock(S88_t* S88, uint16_t* clk, int store) {
   if (store)
     eeprom_write_word(EEREFR, *clk);
 }
-      
-void SetupS88Hardware(void) {
+
+void setNoModules(S88_t* S88, uint8_t bus, uint8_t noModules) {
+    S88->Config.modules[bus] = noModules;
+    S88->State.maxModules = 0;
+    S88->State.totalModules = 0;
+    uint8_t i;
+    for (i = 0; i < S88_MAX_BUSSES; i++) {
+        if (S88->State.maxModules < S88->Config.modules[i]) {
+            S88->State.maxModules = S88->Config.modules[i];
+        }
+        S88->State.totalModules += S88->Config.modules[i];
+    }
+    S88->Config.autoTimeout = (S88->State.maxModules * 2 * 16) + 10;
+}
+
+void SetupS88Hardware(S88_t* S88) {
   // Set direction register for S88 Bus
   S88DDR |= ((1 << PS)|(1 << RST)|(1 << CLK));//|(1 << PWR));
   // Set pull up for data
@@ -284,9 +298,15 @@ void SetupS88Hardware(void) {
     S88_TCCRB |= S88_CS;
 //  OCR1A = 200;
     S88_OCRA = 200; //eeprom_read_word(EEREFR); //T0CNT; // Set the compare value
+  //S88_OCRA = eeprom_read_word(EEREFR); //T0CNT; // Set the compare value
+    
+    uint8_t i;
+    for (i = 0; i < S88_MAX_BUSSES; i++){
+        S88->Config.modules[i] = 0;
+    }
 }
 
-void S88Reset(S88_t* S88) 
+void S88Reset(S88_t* S88)
 {
   STOP_TIMER;
   S88->State.state = IDLE;
