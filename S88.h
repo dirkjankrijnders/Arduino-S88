@@ -65,7 +65,7 @@ enum sendtypes {
   THREEBYTEDATA
 };
 
-void SetupS88Hardware(void);
+void SetupS88Hardware(S88_t* S88);
 void InitForTest(S88_t* S88);
 void SetClock(S88_t* S88, uint16_t* clk, int store);
 uint16_t GetClock(S88_t* S88);
@@ -75,7 +75,7 @@ void SwapAndClearS88Data(S88_t* S88);
 int SendableResponse(S88_t* S88);
 void StartS88Read(S88_t* S88, reportstate full);
 int8_t IsReady(S88_t* S88);
-
+void setNoModules(S88_t* S88, uint8_t bus, uint8_t noModules);
 void S88Reset(S88_t* S88);
 
 #ifdef __cplusplus

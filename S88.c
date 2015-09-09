@@ -11,6 +11,7 @@
 #define OCIEnA OCIE1A
 #define S88WGM TCCR1B |= (1 << WGM12)
 
+#define TIMER_COMP_vect TIMER1_COMPA_vect
 #define START_TIMER TCCR1B |= (1<<CS00)|(1<<CS01)
 #define STOP_TIMER  TCCR1B &= 0B11111000
 
@@ -26,10 +27,28 @@
 
 #define START_TIMER TCCR0B |= (1<<CS00)|(1<<CS01)
 #define STOP_TIMER  TCCR0B &= 0B11111000
+
+#define TIMER_COMP_vect TIMER0_COMPA_vect
+
 #endif
 #define EEREFR (uint16_t*)0x0080
 
 // PIN OUT S88N
+#ifdef __AVR_ATtiny84__
+#define CLK PA2
+#define PS PA1
+#define DATA PA3
+#define RST PA0
+#define PWR PA4
+
+#define S88PORT PORTA
+#define S88PIN PINA
+#define S88DDR DDRA
+
+#define TIMER_COMP_vect TIM0_COMPA_vect
+
+#elif __AVR_ATmega328P__
+
 #define CLK PB6
 #define PS PB4
 #define DATA PB0
@@ -39,6 +58,8 @@
 #define S88PORT PORTB
 #define S88PIN PINB
 #define S88DDR DDRB
+#endif
+
 
 #define cTERM  't'
 #define cINIT  's'
@@ -54,7 +75,7 @@ int commandBufferIndex = 0;
 
 volatile S88_t* _S88;
 
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER_COMP_vect) {
   if (_S88->State.state == CLOCK) {
     asm("sbi 0x03, 6");
     //S88PORT ^= (1<<CLK); // Toggle the pin
@@ -245,12 +266,12 @@ void InitForTest(S88_t* S88) {
   STOP_TIMER;
   
   // Pull RST, LOAD and CLK HIGH while power cycling the S88 bus. This causes compatible decoder to emit a predefined pattern
-  PORTD |= ((1 << RST) | (1 << PS) | (1 << CLK));
-  PORTD &= ~(1 << PWR);
+  S88PORT |= ((1 << RST) | (1 << PS) | (1 << CLK));
+  S88PORT &= ~(1 << PWR);
   _delay_ms(1000);
-  PORTD |= (1 << PWR);
+  S88PORT |= (1 << PWR);
   _delay_ms(1000);
-  PORTD &= ~((1 << RST) | (1 << PS) | (1 << CLK));
+  S88PORT &= ~((1 << RST) | (1 << PS) | (1 << CLK));
   
   // Compatible decoder should now start emitting a predefined pattern, the host computer can read the bus as usual
   START_TIMER;
@@ -276,7 +297,7 @@ void SetClock(S88_t* S88, uint16_t* clk, int store) {
     eeprom_write_word(EEREFR, *clk);
 }
       
-void SetupS88Hardware(void) {
+void SetupS88Hardware(S88_t* S88) {
   // Set direction register for S88 Bus
   S88DDR |= ((1 << PS)|(1 << RST)|(1 << CLK));//|(1 << PWR));
   // Set pull up for data
