@@ -49,11 +49,11 @@
 
 #elif __AVR_ATmega328P__
 
-#define CLK PB6
-#define PS PB4
-#define DATA PB0
-#define RST PB5
-#define PWR PB3
+#define CLK PB2
+#define PS PB1
+#define DATA PB4
+#define RST PB0
+#define PWR PB5
 
 #define S88PORT PORTB
 #define S88PIN PINB
@@ -76,9 +76,10 @@ int commandBufferIndex = 0;
 volatile S88_t* _S88;
 
 ISR(TIMER_COMP_vect) {
+    //PORTB ^= (1 << PB5);
   if (_S88->State.state == CLOCK) {
-    asm("sbi 0x03, 6");
-    //S88PORT ^= (1<<CLK); // Toggle the pin
+    //asm("sbi 0x03, 6");
+    S88PORT ^= (1<<CLK); // Toggle the pin
     _S88->State.CLKC--;
     if  (!(S88PIN & (1 << CLK))) // Down flank
     { 
@@ -275,6 +276,20 @@ void InitForTest(S88_t* S88) {
   
   // Compatible decoder should now start emitting a predefined pattern, the host computer can read the bus as usual
   START_TIMER;
+}
+
+void setNoModules(S88_t* S88, uint8_t bus, uint8_t noModules) {
+    S88->Config.modules[bus] = noModules;
+    S88->State.maxModules = 0;
+    S88->State.totalModules = 0;
+    uint8_t i;
+    for (i = 0; i < S88_MAX_BUSSES; i++) {
+        if (S88->State.maxModules < S88->Config.modules[i]) {
+            S88->State.maxModules = S88->Config.modules[i];
+        }
+        S88->State.totalModules += S88->Config.modules[i];
+    }
+    S88->Config.autoTimeout = (S88->State.maxModules * 2 * 16) + 10;
 }
 
 void StartS88Read(S88_t* S88, reportstate full) {
