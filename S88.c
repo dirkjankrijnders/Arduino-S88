@@ -3,7 +3,7 @@
 #include <util/delay.h>
 #include <avr/eeprom.h> 
 
-#define S88_USE_TIMER0
+#define S88_USE_TIMER2
 #if defined S88_USE_TIMER1
 #define TIMSKn TIMSK1
 #define TCCRnB TCCR1B
@@ -29,6 +29,21 @@
 #define STOP_TIMER  TCCR0B &= 0B11111000
 
 #define TIMER_COMP_vect TIMER0_COMPA_vect
+
+#elif defined S88_USE_TIMER2
+
+#warning Using timer 2
+#define PRR_TIMER  PRR &= !(1 << PRTIM2);
+#define TIMSKn TIMSK2
+#define TCCRnB TCCR2B
+#define OCRnA  OCR2A
+#define OCIEnA OCIE2A
+#define S88WGM TCCR2A |= (1 << WGM21)
+
+#define START_TIMER TCCR2B |= (1<<CS00)|(1<<CS01)
+#define STOP_TIMER  TCCR2B &= 0B11111000
+
+#define TIMER_COMP_vect TIMER2_COMPA_vect
 
 #endif
 #define EEREFR (uint16_t*)0x0080
