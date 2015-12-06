@@ -1,0 +1,5 @@
+S88_t			KEYWORD2
+SetupS88Hardware	KEYWORD2
+StartS88Read		KEYWORD2
+setNoModules		KEYWORD2
+IsReady			KEYWORD2
