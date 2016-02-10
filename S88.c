@@ -8,6 +8,7 @@
 
 #define EEREFR (uint16_t*)0x0080
 
+#ifdef ATMEGA32u4
 // PIN OUT S88N
 #define CLK PB6
 #define PS PB4
@@ -18,7 +19,17 @@
 #define S88PORT PORTB
 #define S88PIN PINB
 #define S88DDR DDRB
+#else
+#define CLK PA0
+#define PS PA1
+#define DATA PA3
+#define RST PA2
+#define PWR PA4
 
+#define S88PORT PORTA
+#define S88PIN PINA
+#define S88DDR DDRA
+#endif
 #define cTERM  't'
 #define cINIT  's'
 #define cFULL  'm'
@@ -224,12 +235,12 @@ void InitForTest(S88_t* S88) {
   STOP_TIMER1;
   
   // Pull RST, LOAD and CLK HIGH while power cycling the S88 bus. This causes compatible decoder to emit a predefined pattern
-  PORTD |= ((1 << RST) | (1 << PS) | (1 << CLK));
-  PORTD &= ~(1 << PWR);
+  S88PORT |= ((1 << RST) | (1 << PS) | (1 << CLK));
+  S88PORT &= ~(1 << PWR);
   _delay_ms(1000);
-  PORTD |= (1 << PWR);
+  S88PORT |= (1 << PWR);
   _delay_ms(1000);
-  PORTD &= ~((1 << RST) | (1 << PS) | (1 << CLK));
+  S88PORT &= ~((1 << RST) | (1 << PS) | (1 << CLK));
   
   // Compatible decoder should now start emitting a predefined pattern, the host computer can read the bus as usual
   START_TIMER1;
