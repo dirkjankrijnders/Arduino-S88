@@ -3,13 +3,14 @@
 #include <util/delay.h>
 #include <avr/eeprom.h> 
 
-#define START_TIMER1 TCCR1B |= (1<<CS00)|(1<<CS01) 
-#define STOP_TIMER1  TCCR1B &= 0B11111000 
 
 #define EEREFR (uint16_t*)0x0080
 
 #ifdef ATMEGA32u4
 // PIN OUT S88N
+#define START_TIMER1 TCCR1B |= (1<<CS10)|(1<<CS11)|(1<<CS12)
+#define STOP_TIMER1  TCCR1B &= 0B11111000 
+
 #define CLK PB6
 #define PS PB4
 #define DATA PB0
@@ -20,6 +21,9 @@
 #define S88PIN PINB
 #define S88DDR DDRB
 #else
+#define START_TIMER1 TCCR0B |= (1<<CS00) |(1<<CS01)
+#define STOP_TIMER1  TCCR0B &= 0B11111000 
+
 #define CLK PA0
 #define PS PA1
 #define DATA PA3
@@ -44,10 +48,15 @@ int commandBufferIndex = 0;
 
 volatile S88_t* _S88;
 
-ISR(TIMER1_COMPA_vect) {
+#ifdef ATMEGA32u4
+	ISR(TIM1_COMPA_vect) {
+#else
+	ISR(TIM0_COMPA_vect) {
+#endif
+	//	;
   if (_S88->State.state == CLOCK) {
-    asm("sbi 0x03, 6");
-    //S88PORT ^= (1<<CLK); // Toggle the pin
+    //asm("sbi 0x03, 6");
+	  S88PORT ^= (1<<CLK); // Toggle the pin
     _S88->State.CLKC--;
     if  (!(S88PIN & (1 << CLK))) // Down flank
     { 
@@ -74,6 +83,7 @@ ISR(TIMER1_COMPA_vect) {
     { // Pulse reset
       S88PORT ^= (1<<RST); // Toggle the pin
       _S88->State.state = RESET;
+//    	PINA = 0xf;
   } else if (_S88->State.state == RESET) {
     S88PORT ^= (1<<RST); // Toggle the pin
     _S88->State.state = PRELOAD;
@@ -115,7 +125,7 @@ void cmdDispatcher(S88_t* S88, char cmd[8] ) {
       strncpy(S88->State.responseBuffer, "s0\r\0", 4);
       S88->State.responseBuffer[1] = S88->State.totalModules;
       S88->Config.autoTimeout = (S88->State.maxModules * 2 * 16) + 10; // 32 Timer1 compares per module and 10 for the RESET and LOAD/PS header.
-      StartS88Read(S88, FULL);
+	  //StartS88Read(S88, FULL);
       break;
     case cFULL:
       StartS88Read(S88, FULL);
@@ -124,26 +134,29 @@ void cmdDispatcher(S88_t* S88, char cmd[8] ) {
       strncpy(S88->State.responseBuffer , "CmpRR-88 0.1\r\0", 14);
       S88->State.state = IDLE;
       break;
-    case cREFR:
+    case cREFR: {
       SetClock(S88, (uint16_t*)&(cmd[1]), 1);
       strncpy(S88->State.responseBuffer , "rxx\r\0", 5);
       uint16_t clk = GetClock(S88);
       S88->State.responseBuffer[1] = (int8_t)clk;
       S88->State.responseBuffer[2] = (int8_t)(clk >> 8);
   
-      break;
-    case cTEST:
+      break;}
+/*    case cTEST:
       InitForTest(S88);
-      break;
+      break;*/
     default:
+	{
       strncpy(S88->State.responseBuffer, "Error\r", 7);
       S88->State.state = IDLE;
+  }
     }
 //    S88->State.responseBuffer[1] = cmd[0];
   }
 };
 
 int8_t IsReady(S88_t* S88){
+	//return 1;
 	if (S88->State.state == SENDDATA) {
 		return 1;
 	} else {
@@ -246,7 +259,7 @@ void InitForTest(S88_t* S88) {
   START_TIMER1;
 }
 
-void StartS88Read(S88_t* S88, reportstate full) {
+void StartS88Read(volatile S88_t* S88, reportstate full) {
   S88->State.reportState = full;
   S88->State.state = STARTREAD;
   S88->State.CLKC = 2*16*S88->State.maxModules; // up and downflank, 16 bits per module
@@ -261,7 +274,7 @@ uint16_t GetClock(S88_t* S88) {
 }
 
 void SetClock(S88_t* S88, uint16_t* clk, int store) {
-  OCR1A = *clk;
+  OCR0A = *clk;
   if (store)
     eeprom_write_word(EEREFR, *clk);
 }
@@ -269,14 +282,27 @@ void SetClock(S88_t* S88, uint16_t* clk, int store) {
 void SetupS88Hardware(void) {
   // Set direction register for S88 Bus
   S88DDR |= ((1 << PS)|(1 << RST)|(1 << CLK));//|(1 << PWR));
-  // Set pull up for data
-//    S88PORT |= (1 << DATA);
+  S88DDR &= ~(1<<DATA); // Make sure DATA is input
+   
+  // Unset pull up for data
+  S88PORT &= ~(1 << DATA);
   // Setup S88 Clock
+#ifdef ATMEGA32u4
+  
   TIMSK1 = _BV(OCIE1A); // Interrupt on T0CNT == COMPA
   TCCR1B = _BV(WGM12);  // Timer clear on Compare match
   
-//  OCR1A = 200;
-  OCR1A = eeprom_read_word(EEREFR); //T0CNT; // Set the compare value
+  OCR1A = 200;
+#else
+  TCCR0A = 0;
+  TCCR0B = 0;
+  
+  TIMSK0 |= (1 << OCIE0A); // Interrupt on T0CNT == COMPA
+  TCCR0A |= (1 << WGM01); // Timer clear on Compare match
+//  TIFR0 |= (1<<OCF0A);
+  OCR0A = 200;
+#endif
+  //OCR1A = eeprom_read_word(EEREFR); //T0CNT; // Set the compare value
 }
 
 void S88Reset(S88_t* S88) 
