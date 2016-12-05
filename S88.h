@@ -17,6 +17,7 @@ extern "C" {
 enum states {
   IDLE = 0,
   STARTREAD,
+  PRERESET,
   RESET, 
   PRELOAD,
   PRELOADCLK,
