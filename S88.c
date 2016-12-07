@@ -79,16 +79,16 @@ volatile S88_t* _S88;
     if (_S88->State.timeout++ > _S88->Config.autoTimeout){
       StartS88Read(_S88, DIFF);
     }
-  } else if (_S88->State.state == STARTREAD) 
+  } else if (_S88->State.state == PRERESET) 
     { // Pulse reset
       S88PORT ^= (1<<RST); // Toggle the pin
       _S88->State.state = RESET;
 //    	PINA = 0xf;
   } else if (_S88->State.state == RESET) {
     S88PORT ^= (1<<RST); // Toggle the pin
-    _S88->State.state = PRELOAD;
+    _S88->State.state = POSTLOAD;
     _S88->State.module = 0;
-  } else if (_S88->State.state == PRELOAD) { // && !(S88PIN & (1 << PS))) {
+  } else if (_S88->State.state == STARTREAD) { // && !(S88PIN & (1 << PS))) {
     _S88->State.state = PRELOADCLK;
     S88PORT ^= (1<<PS);
   } else if (_S88->State.state == PRELOADCLK) { // && (S88PIN & (1 << PS))) {
@@ -100,7 +100,7 @@ volatile S88_t* _S88;
     S88PORT ^= (1<<CLK); // Toggle the pin (down)
     _S88->State.bit = 0;
     _S88->Config.data[_S88->Config.activeData][_S88->State.module] |= ((S88PIN & (1<<DATA)) ? 1 : 0) ;
-    _S88->State.state = POSTLOAD;
+    _S88->State.state = PRERESET;
   } else if (_S88->State.state == POSTLOAD) {// && !(S88PIN & (1 << CLK))) {
     S88PORT ^= (1<<PS);
     _S88->State.state = CLOCK;
