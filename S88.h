@@ -17,6 +17,7 @@ extern "C" {
 enum states {
   IDLE = 0,
   STARTREAD,
+  PRERESET,
   RESET, 
   PRELOAD,
   PRELOADCLK,
@@ -73,7 +74,7 @@ uint16_t GetClock(S88_t* S88);
 void cmdDispatcher(S88_t* S88, char cmd[8] );
 void SwapAndClearS88Data(S88_t* S88);
 int SendableResponse(S88_t* S88);
-void StartS88Read(S88_t* S88, reportstate full);
+void StartS88Read(volatile S88_t* S88, reportstate full);
 int8_t IsReady(S88_t* S88);
 
 void S88Reset(S88_t* S88);
