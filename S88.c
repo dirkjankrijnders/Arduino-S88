@@ -21,7 +21,7 @@
 #define S88PIN PINB
 #define S88DDR DDRB
 #else
-#define START_TIMER1 TCCR0B |= (1<<CS00) |(1<<CS01)
+#define START_TIMER1 TCCR0B |= (1<<CS01)
 #define STOP_TIMER1  TCCR0B &= 0B11111000 
 
 #define CLK PA0
