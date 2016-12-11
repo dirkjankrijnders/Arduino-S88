@@ -79,6 +79,7 @@ volatile S88_t* _S88;
     _S88->State.module = 0;
   } else if (_S88->State.state == STARTREAD) { // && !(S88PIN & (1 << PS))) {
     _S88->State.state = PRELOADCLK;
+	S88PORT &= ! ((1<<CLK) | (1<<PS) | (1<<RESET));
     S88PORT ^= (1<<PS);
   } else if (_S88->State.state == PRELOADCLK) { // && (S88PIN & (1 << PS))) {
     _S88->State.CLKC--;
