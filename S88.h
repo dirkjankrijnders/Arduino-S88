@@ -35,7 +35,6 @@ typedef enum  {
 typedef struct {
     uint8_t modules[S88_MAX_BUSSES];
     uint16_t data[2][S88_MAX_MODULES];
-    uint8_t changedModules[S88_MAX_MODULES];
     uint16_t autoTimeout;
     uint8_t activeData;
   } S88_Config_t;
@@ -50,7 +49,6 @@ typedef struct {
     uint8_t state;
     reportstate reportState;
     uint16_t timeout;
-    char responseBuffer[80];
   } S88_State_t;
 
 typedef struct {
@@ -58,22 +56,14 @@ typedef struct {
     S88_State_t State;
   } S88_t;
 
-enum sendtypes {
-  STRING = -1,
-  NONE = 0,
-  ONEBYTEDATA,
-  TWOBYTEDATA,    
-  THREEBYTEDATA
-};
 
 void SetupS88Hardware(S88_t* S88);
+void SetNoModules(S88_t* S88, uint8_t modules, uint8_t bus);
 void InitForTest(S88_t* S88);
 void SetClock(S88_t* S88, uint16_t* clk, int store);
 uint16_t GetClock(S88_t* S88);
  
-void cmdDispatcher(S88_t* S88, char cmd[8] );
 void SwapAndClearS88Data(S88_t* S88);
-int SendableResponse(S88_t* S88);
 void StartS88Read(volatile S88_t* S88, reportstate full);
 int8_t IsReady(S88_t* S88);
 
