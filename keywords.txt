@@ -1,3 +1,8 @@
 S88_t			KEYWORD2
 SetupS88Hardware	KEYWORD2
 StartS88Read		KEYWORD2
+SetNoModules		KEYWORD2
+SetClock			KEYWORD2
+GetClock			KEYWORD2
+SwapAndClearS88Data	KEYWORD2
+IsReady				KEYWORD2
