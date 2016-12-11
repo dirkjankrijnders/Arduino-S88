@@ -279,7 +279,7 @@ void SetClock(S88_t* S88, uint16_t* clk, int store) {
     eeprom_write_word(EEREFR, *clk);
 }
       
-void SetupS88Hardware(void) {
+void SetupS88Hardware(S88_t* S88) {
   // Set direction register for S88 Bus
   S88DDR |= ((1 << PS)|(1 << RST)|(1 << CLK));//|(1 << PWR));
   S88DDR &= ~(1<<DATA); // Make sure DATA is input
