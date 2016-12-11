@@ -96,6 +96,10 @@ volatile S88_t* _S88;
   }
 }
 
+/**
+* Set the number of S88 modules on a bus.
+* 
+**/
 void SetNoModules(S88_t* S88, uint8_t modules, uint8_t bus) {
       S88->Config.modules[bus] = modules;
       S88->State.maxModules = (S88->State.maxModules > S88->Config.modules[bus]) ? S88->State.maxModules : S88->Config.modules[bus];
