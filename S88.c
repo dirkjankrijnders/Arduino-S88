@@ -47,17 +47,21 @@ volatile S88_State_t State;
   if (State.state == CLOCK) {
     //asm("sbi 0x03, 6");
 	//  S88PORT ^= (1<<CLK); // Toggle the pin
+	asm("sbi %[s88pin], %[CLKBIT] ; Toggle the clock pin\n\t"
+		:
+		: [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), 
+	      [CLKBIT]"I" (CLK));
     State.CLKC--;
     if  (!(S88PIN & (1 << CLK))) // Down flank
     { 
-      State.bit++;
-      if (State.bit > 7) {
+      State.bit = (State.bit >> 1);
+      if (State.bit == 0) {
 		_S88->Config.data[_S88->Config.activeData][State.module] = State.currentByte;
 		State.currentByte = 0;  
         State.module++;
-        State.bit = 0;
+        State.bit = 128;
       }
-      asm("sbi %[s88pin], %[CLKBIT] ; Toggle the clock pin\n\t"
+/*      asm("sbi %[s88pin], %[CLKBIT] ; Toggle the clock pin\n\t"
 //  		"lds __tmp_reg__, %a[CB]\n\t"
   		"sbic %[s88pin], %[DATABIT] ; Skip next instruction if dataline low \n\t"
   		"sbr %[r1], %[BIT]\n\t"
@@ -65,10 +69,13 @@ volatile S88_State_t State;
 	  		: [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), 
 			  [CLKBIT] "I" (CLK), 
 			  [DATABIT] "I" (DATA), 
-			  [BIT] "r" (State.bit));
-//      uint8_t t;
-//      t = (S88PIN & (1<<DATA)) ? 1 : 0 ;
-//      _S88->Config.data[_S88->Config.activeData][State.module] |= (t << State.bit);
+			  [BIT] "r" (State.bit));*/
+	  asm("sbic %[s88pin], %[DATABIT] ; Skip setting the bit if data line low\n\t"
+  		"or %[cb], %[bit]\n\t"
+  		: [cb] "+r" (State.currentByte) 
+  		: [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), 
+  		  [DATABIT] "I" (DATA),
+		  [bit] "r" (State.bit));
     }
     if (State.CLKC == 0) 
     {
@@ -95,13 +102,15 @@ volatile S88_State_t State;
     State.state = POSTLOADCLK;
   } else if (State.state == POSTLOADCLK) { //} && (S88PIN & (1 << CLK))) {
     State.CLKC--;
-    State.bit = 0;
-    asm("sbi %[s88pin], %[CLKBIT]\n\t"
-		"lds __tmp_reg__, State+%[CB]\n\t"
-		"sbic %[s88pin], %[DATABIT]\n\t"
-		"sbr __tmp_reg__, 0\n\t"
-		"sts State+%[CB], __tmp_reg__\n\t" :  : [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), [CLKBIT]"I" (CLK), [DATABIT] "I" (DATA), [CB] "I" (offsetof(S88_State_t, currentByte)));
-    //_S88->Config.data[_S88->Config.activeData][State.module] |= ((S88PIN & (1<<DATA)) ? 1 : 0) ;
+    State.bit = 128;
+    asm("sbi %[s88pin], %[CLKBIT] ; Toggle the clock pin\n\t"
+		"sbic %[s88pin], %[DATABIT] ; Skip setting the bit if data line low\n\t"
+		"sbr %[cb], 0\n\t"
+		: [cb] "+r" (State.currentByte) 
+		: [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), 
+		  [CLKBIT]"I" (CLK), 
+		  [DATABIT] "I" (DATA));
+		 //_S88->Config.data[_S88->Config.activeData][State.module] |= ((S88PIN & (1<<DATA)) ? 1 : 0) ;
     State.state = PRERESET;
   } else if (State.state == POSTLOAD) {// && !(S88PIN & (1 << CLK))) {
     asm("sbi %0, %1" : :"I" (_SFR_IO_ADDR(S88PIN)), "I" (PS));
@@ -162,7 +171,7 @@ void StartS88Read(volatile S88_t* S88, reportstate full) {
   State.state = STARTREAD;
   State.CLKC = 2*8*S88->Config.maxModules; // up and downflank, 16 bits per module
   State.module = 0;
-  State.bit = 0;
+  State.bit = 128;
   _S88 = S88; // Make the S88 struct available to the interupt routine
   START_TIMER1;
 }
@@ -179,7 +188,7 @@ void SetClock(S88_t* S88, uint16_t* clk, int store) {
       
 void SetupS88Hardware(S88_t* S88) {
   // Set direction register for S88 Bus
-  S88DDR |= ((1 << PS)|(1 << RST)|(1 << CLK));//|(1 << PWR));
+  S88DDR |= ((1 << PS)|(1 << RST)|(1 << CLK)|(1<<PA5));//|(1 << PWR));
   S88DDR &= ~(1<<DATA); // Make sure DATA is input
    
   // Unset pull up for data
