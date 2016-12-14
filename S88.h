@@ -8,23 +8,22 @@
 #include <avr/interrupt.h> 
 
 #define S88_MAX_BUSSES 3
-#define S88_MAX_MODULES 31
+#define S88_MAX_MODULES 62
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 enum states {
-  IDLE = 0,
-  STARTREAD,
-  PRERESET,
-  RESET, 
-  PRELOAD,
-  PRELOADCLK,
-  POSTLOADCLK, 
-  POSTLOAD, 
+  SENDDATA = 0, // Prob. not neccesary
   CLOCK,
-  SENDDATA
+  POSTLOAD, 
+  RESET, 
+  PRERESET,
+  POSTLOADCLK, 
+  PRELOADCLK,
+  STARTREAD,
+  IDLE
 };
 
 typedef enum  {
@@ -34,21 +33,22 @@ typedef enum  {
 
 typedef struct {
     uint8_t modules[S88_MAX_BUSSES];
-    uint16_t data[2][S88_MAX_MODULES];
+    uint8_t data[2][S88_MAX_MODULES];
     uint16_t autoTimeout;
     uint8_t activeData;
+    uint8_t maxModules;
+    uint8_t totalModules;
   } S88_Config_t;
 
 typedef struct {
     uint8_t module;
-    uint16_t bit;
-    uint8_t maxModules;
-    uint8_t totalModules;
-    uint8_t diffModules;
+    uint8_t bit;
+    //uint8_t diffModules;
     uint8_t CLKC;
     uint8_t state;
-    reportstate reportState;
-    uint16_t timeout;
+    //reportstate reportState;
+    //uint16_t timeout;
+    uint8_t currentByte;
   } S88_State_t;
 
 typedef struct {

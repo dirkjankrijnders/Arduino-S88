@@ -2,7 +2,7 @@
 #include <string.h>
 #include <util/delay.h>
 #include <avr/eeprom.h> 
-
+#include <stddef.h>
 
 #define EEREFR (uint16_t*)0x0080
 
@@ -36,65 +36,78 @@
 #endif
 
 volatile S88_t* _S88;
+volatile S88_State_t State;
 
 #ifdef ATMEGA32u4
 	ISR(TIM1_COMPA_vect) {
 #else
 	ISR(TIM0_COMPA_vect) {
 #endif
-	//	;
-  if (_S88->State.state == CLOCK) {
+  asm("sbi %0, %1" : :"I" (_SFR_IO_ADDR(S88PIN)), "I" (PA5));
+  if (State.state == CLOCK) {
     //asm("sbi 0x03, 6");
-	  S88PORT ^= (1<<CLK); // Toggle the pin
-    _S88->State.CLKC--;
+	//  S88PORT ^= (1<<CLK); // Toggle the pin
+    State.CLKC--;
     if  (!(S88PIN & (1 << CLK))) // Down flank
     { 
-      _S88->State.bit++;
-      if (_S88->State.bit > 15) {
-        _S88->State.module++;
-        _S88->State.bit = 0;
+      State.bit++;
+      if (State.bit > 7) {
+		_S88->Config.data[_S88->Config.activeData][State.module] = State.currentByte;
+		State.currentByte = 0;  
+        State.module++;
+        State.bit = 0;
       }
-      uint8_t t;
-      t = (S88PIN & (1<<DATA)) ? 1 : 0 ;
-      _S88->Config.data[_S88->Config.activeData][_S88->State.module] |= (t << _S88->State.bit);
+      asm("sbi %[s88pin], %[CLKBIT] ; Toggle the clock pin\n\t"
+//  		"lds __tmp_reg__, %a[CB]\n\t"
+  		"sbic %[s88pin], %[DATABIT] ; Skip next instruction if dataline low \n\t"
+  		"sbr %[r1], %[BIT]\n\t"
+ 			: [r1] "+r" (State.currentByte) 
+	  		: [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), 
+			  [CLKBIT] "I" (CLK), 
+			  [DATABIT] "I" (DATA), 
+			  [BIT] "r" (State.bit));
+//      uint8_t t;
+//      t = (S88PIN & (1<<DATA)) ? 1 : 0 ;
+//      _S88->Config.data[_S88->Config.activeData][State.module] |= (t << State.bit);
     }
-    if (_S88->State.CLKC == 0) 
+    if (State.CLKC == 0) 
     {
-      _S88->State.state = SENDDATA;
-      _S88->State.module = 0; // Used again for sending the data
-      _S88->State.timeout = 0;
+      State.state = SENDDATA;
+      State.module = 0; // Used again for sending the data
+//      State.timeout = 0;
     }
-  } else if (_S88->State.state == IDLE)  {
-    if (_S88->State.timeout++ > _S88->Config.autoTimeout){
-      StartS88Read(_S88, DIFF);
-    }
-  } else if (_S88->State.state == PRERESET) 
+  } else if (State.state == PRERESET) 
     { // Pulse reset
       S88PORT ^= (1<<RST); // Toggle the pin
-      _S88->State.state = RESET;
+      State.state = RESET;
 //    	PINA = 0xf;
-  } else if (_S88->State.state == RESET) {
+  } else if (State.state == RESET) {
     S88PORT ^= (1<<RST); // Toggle the pin
-    _S88->State.state = POSTLOAD;
-    _S88->State.module = 0;
-  } else if (_S88->State.state == STARTREAD) { // && !(S88PIN & (1 << PS))) {
-    _S88->State.state = PRELOADCLK;
+    State.state = POSTLOAD;
+    State.module = 0;
+  } else if (State.state == STARTREAD) { // && !(S88PIN & (1 << PS))) {
+    State.state = PRELOADCLK;
 	S88PORT &= ! ((1<<CLK) | (1<<PS) | (1<<RESET));
     S88PORT ^= (1<<PS);
-  } else if (_S88->State.state == PRELOADCLK) { // && (S88PIN & (1 << PS))) {
-    _S88->State.CLKC--;
+  } else if (State.state == PRELOADCLK) { // && (S88PIN & (1 << PS))) {
+    State.CLKC--;
     S88PORT ^= (1<<CLK); // Toggle the pin (up)
-    _S88->State.state = POSTLOADCLK;
-  } else if (_S88->State.state == POSTLOADCLK) { //} && (S88PIN & (1 << CLK))) {
-    _S88->State.CLKC--;
-    S88PORT ^= (1<<CLK); // Toggle the pin (down)
-    _S88->State.bit = 0;
-    _S88->Config.data[_S88->Config.activeData][_S88->State.module] |= ((S88PIN & (1<<DATA)) ? 1 : 0) ;
-    _S88->State.state = PRERESET;
-  } else if (_S88->State.state == POSTLOAD) {// && !(S88PIN & (1 << CLK))) {
-    S88PORT ^= (1<<PS);
-    _S88->State.state = CLOCK;
+    State.state = POSTLOADCLK;
+  } else if (State.state == POSTLOADCLK) { //} && (S88PIN & (1 << CLK))) {
+    State.CLKC--;
+    State.bit = 0;
+    asm("sbi %[s88pin], %[CLKBIT]\n\t"
+		"lds __tmp_reg__, State+%[CB]\n\t"
+		"sbic %[s88pin], %[DATABIT]\n\t"
+		"sbr __tmp_reg__, 0\n\t"
+		"sts State+%[CB], __tmp_reg__\n\t" :  : [s88pin] "I" (_SFR_IO_ADDR(S88PIN)), [CLKBIT]"I" (CLK), [DATABIT] "I" (DATA), [CB] "I" (offsetof(S88_State_t, currentByte)));
+    //_S88->Config.data[_S88->Config.activeData][State.module] |= ((S88PIN & (1<<DATA)) ? 1 : 0) ;
+    State.state = PRERESET;
+  } else if (State.state == POSTLOAD) {// && !(S88PIN & (1 << CLK))) {
+    asm("sbi %0, %1" : :"I" (_SFR_IO_ADDR(S88PIN)), "I" (PS));
+    State.state = CLOCK;
   }
+  asm("sbi %0, %1" : :"I" (_SFR_IO_ADDR(S88PIN)), "I" (PA5));
 }
 
 /**
@@ -103,9 +116,9 @@ volatile S88_t* _S88;
 **/
 void SetNoModules(S88_t* S88, uint8_t modules, uint8_t bus) {
       S88->Config.modules[bus] = modules;
-      S88->State.maxModules = (S88->State.maxModules > S88->Config.modules[bus]) ? S88->State.maxModules : S88->Config.modules[bus];
-      S88->State.totalModules = S88->Config.modules[0] + S88->Config.modules[1] + S88->Config.modules[2];
-      S88->Config.autoTimeout = (S88->State.maxModules * 2 * 16) + 10; // 32 Timer1 compares per module and 10 for the RESET and LOAD/PS header.	
+      S88->Config.maxModules = (S88->Config.maxModules > S88->Config.modules[bus]) ? S88->Config.maxModules : S88->Config.modules[bus];
+      S88->Config.totalModules = S88->Config.modules[0] + S88->Config.modules[1] + S88->Config.modules[2];
+      S88->Config.autoTimeout = (S88->Config.maxModules * 2 * 16) + 10; // 32 Timer1 compares per module and 10 for the RESET and LOAD/PS header.	
 }
 
 int8_t IsReady(S88_t* S88){
@@ -120,7 +133,7 @@ void SwapAndClearS88Data(S88_t* S88)
 { 
   S88->Config.activeData = (S88->Config.activeData == 0) ? 1 : 0;
   uint8_t i = 0;
-  for (i=0; i < S88->State.maxModules; i++) {
+  for (i=0; i < S88->Config.maxModules; i++) {
     S88->Config.data[S88->Config.activeData][i] = (uint16_t)0;
   }
 }
@@ -145,11 +158,11 @@ void InitForTest(S88_t* S88) {
 }
 
 void StartS88Read(volatile S88_t* S88, reportstate full) {
-  S88->State.reportState = full;
-  S88->State.state = STARTREAD;
-  S88->State.CLKC = 2*16*S88->State.maxModules; // up and downflank, 16 bits per module
-  S88->State.module = 0;
-  S88->State.bit = 0;
+//  State.reportState = full;
+  State.state = STARTREAD;
+  State.CLKC = 2*8*S88->Config.maxModules; // up and downflank, 16 bits per module
+  State.module = 0;
+  State.bit = 0;
   _S88 = S88; // Make the S88 struct available to the interupt routine
   START_TIMER1;
 }
